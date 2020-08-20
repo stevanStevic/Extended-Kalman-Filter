@@ -1,5 +1,7 @@
 #include "kalman_filter.h"
 
+#include <iostream>
+
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
 
@@ -22,20 +24,86 @@ void KalmanFilter::Init(VectorXd &x_in, MatrixXd &P_in, MatrixXd &F_in,
   Q_ = Q_in;
 }
 
-void KalmanFilter::Predict() {
-  /**
-   * TODO: predict the state
-   */
+void KalmanFilter::Predict() 
+{
+  x_ = F_ * x_;
+  MatrixXd Ft = F_.transpose();
+  P_ = F_ * P_ * Ft + Q_;
 }
 
 void KalmanFilter::Update(const VectorXd &z) {
-  /**
-   * TODO: update the state by using Kalman Filter equations
-   */
+  VectorXd z_pred = H_ * x_;
+  VectorXd y = z - z_pred;
+  MatrixXd Ht = H_.transpose();
+  MatrixXd S = H_ * P_ * Ht + R_;
+  MatrixXd Si = S.inverse();
+  MatrixXd PHt = P_ * Ht;
+  MatrixXd K = PHt * Si;
+
+  //new estimate
+  x_ = x_ + (K * y);
+  long x_size = x_.size();
+  MatrixXd I = MatrixXd::Identity(x_size, x_size);
+  P_ = (I - K * H_) * P_;
 }
 
-void KalmanFilter::UpdateEKF(const VectorXd &z) {
-  /**
-   * TODO: update the state by using Extended Kalman Filter equations
-   */
+// Actually represents h(x')
+VectorXd KalmanFilter::h(const VectorXd& state)
+{
+   const double px{state(0)};
+   const double py{state(1)};
+   const double vx{state(2)};
+   const double vy{state(3)};
+
+   double rho = sqrt(px * px + py * py);
+   const double phi = std::atan2(py, px);
+  
+   if (rho <= 0)
+   {
+      rho = 1;
+   }
+
+   const double rho_dot = (px * vx + py * vy) / rho;
+
+   VectorXd polar_state = VectorXd(3);
+   polar_state << rho, phi, rho_dot;
+
+   return polar_state;
+}
+
+void KalmanFilter::NormalizeAngle(double& angle)
+{
+   while (angle > M_PI || angle < -M_PI)
+   {
+      if (angle > M_PI)
+      {
+         angle -= 2 * M_PI;
+      }
+      else
+      {
+         angle += 2 * M_PI;
+      }
+   }
+}
+
+void KalmanFilter::UpdateEKF(const VectorXd &z) 
+{
+  VectorXd x_f = h(x_);
+
+  VectorXd y = z - x_f;
+  
+  auto& phi = y(1);
+  NormalizeAngle(phi);
+
+  MatrixXd Ht = H_.transpose();
+  MatrixXd S = H_ * P_ * Ht + R_;
+  MatrixXd Si = S.inverse();
+  MatrixXd PHt = P_ * Ht;
+  MatrixXd K = PHt * Si;
+
+  //new estimate
+  x_ = x_ + (K * y);
+  long x_size = x_.size();
+  MatrixXd I = MatrixXd::Identity(x_size, x_size);
+  P_ = (I - K * H_) * P_;
 }

@@ -46,6 +46,18 @@ class KalmanFilter {
    */
   void UpdateEKF(const Eigen::VectorXd &z);
 
+  /**
+   * Convert from cartesian state to polar
+   * @param state cartesian state[px, py, vx, vy]
+   */
+  Eigen::VectorXd h(const Eigen::VectorXd &state);
+
+  /**
+   * Set PHI angle between -PI and PI
+   * @param state polar PHI
+   */
+  void NormalizeAngle(double &angle);
+
   // state vector
   Eigen::VectorXd x_;
 
