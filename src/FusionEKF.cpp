@@ -41,6 +41,7 @@ FusionEKF::FusionEKF() {
   VectorXd x = VectorXd(4);
 
   // state covariance matrix P
+  // Uncertanity in velocity is high
   MatrixXd P = MatrixXd(4, 4);
   P <<  1, 0, 0, 0,
         0, 1, 0, 0,
@@ -60,9 +61,14 @@ FusionEKF::FusionEKF() {
         0, 0, 0, 0,
         0, 0, 0, 0;
 
+  // We want to take state and velocity into account
+  H_laser_ << 1, 0, 0, 0,
+              0, 1, 0, 0;
+
   ekf_.Init(x, P, F, H_laser_, R_laser_, Q);
 
   // set the acceleration noise components
+  // Use noise_ax = 9 and noise_ay = 9 for your Q matrix.
   noise_ax = 9;
   noise_ay = 9;
 }
@@ -78,8 +84,8 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
    */
   if (!is_initialized_) {
     /**
-     * TODO: Initialize the state ekf_.x_ with the first measurement.
-     * TODO: Create the covariance matrix.
+     * Initialize the state ekf_.x_ with the first measurement.
+     * Create the covariance matrix.
      * You'll need to convert radar from polar to cartesian coordinates.
      */
 
@@ -89,8 +95,15 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
     ekf_.x_ << 1, 1, 1, 1;
 
     if (measurement_pack.sensor_type_ == MeasurementPackage::RADAR) {
-      // TODO: Convert radar from polar to cartesian coordinates 
-      //         and initialize state.
+      /*
+      Initializing the State Vector
+
+      You'll need to initialize the state vector with the first sensor measurement.
+      Although radar gives velocity data in the form of the range rate ρ˙\dot{\rho}ρ˙​,
+      a radar measurement does not contain enough information to determine the state variable velocities vxv_xvx​ and vyv_yvy​.
+      You can, however, use the radar measurements ρ\rhoρ and ϕ\phiϕ to initialize the state variable locations pxp_xpx​ and pyp_ypy​.
+
+      */
       float ro = measurement_pack.raw_measurements_[0];
       float phi = measurement_pack.raw_measurements_[1];
 
@@ -102,8 +115,8 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
     else if (measurement_pack.sensor_type_ == MeasurementPackage::LASER) {
       // TODO: Initialize state.
       ekf_.x_ << measurement_pack.raw_measurements_[0],
-                 measurement_pack.raw_measurements_[1], 
-                 0, 
+                 measurement_pack.raw_measurements_[1],
+                 0,
                  0;
 
     }
@@ -119,16 +132,17 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
    */
 
   /**
-   * TODO: Update the state transition matrix F according to the new elapsed time.
+   * Update the state transition matrix F according to the new elapsed time.
    * Time is measured in seconds.
-   * TODO: Update the process noise covariance matrix.
+   * Update the process noise covariance matrix.
    * Use noise_ax = 9 and noise_ay = 9 for your Q matrix.
    */
+
   // compute the time elapsed between the current and previous measurements
   // dt - expressed in seconds
   float dt = (measurement_pack.timestamp_ - previous_timestamp_) / 1000000.0;
   previous_timestamp_ = measurement_pack.timestamp_;
-  
+
   float dt_2 = dt * dt;
   float dt_3 = dt_2 * dt;
   float dt_4 = dt_3 * dt;
@@ -152,12 +166,11 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
    */
 
   /**
-   * TODO:
    * - Use the sensor type to perform the update step.
    * - Update the state and covariance matrices.
    */
 
-  if (measurement_pack.sensor_type_ == MeasurementPackage::RADAR) 
+  if (measurement_pack.sensor_type_ == MeasurementPackage::RADAR)
   {
     MatrixXd Hj = tools.CalculateJacobian(ekf_.x_);
 
@@ -165,8 +178,8 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
     ekf_.H_ = Hj;
 
     ekf_.UpdateEKF(measurement_pack.raw_measurements_);
-  } 
-  else 
+  }
+  else
   {
     ekf_.R_ = R_laser_;
     ekf_.H_ = H_laser_;
